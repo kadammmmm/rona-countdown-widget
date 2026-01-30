@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RONA Countdown Widget - Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+      min-height: 100vh;
+      color: #fff;
+    }
+
+    /* Simulated Desktop Header */
+    .desktop-header {
+      background: linear-gradient(180deg, #2d2d4a 0%, #1e1e35 100%);
+      border-bottom: 1px solid #3a3a5c;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .webex-logo {
+      font-size: 20px;
+      font-weight: 700;
+      color: #00bceb;
+      letter-spacing: 1px;
+    }
+
+    .header-divider {
+      width: 1px;
+      height: 30px;
+      background: #3a3a5c;
+    }
+
+    .agent-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .agent-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00bceb, #0088a9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .agent-details {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .agent-name {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .agent-id {
+      font-size: 11px;
+      color: #8a8aaa;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* Advanced Header Area - Where our widget goes */
+    .advanced-header {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 1px solid #2a2a4a;
+    }
+
+    .advanced-header-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #6a6a8a;
+      padding-right: 16px;
+      border-right: 1px solid #3a3a5c;
+    }
+
+    /* Demo Controls */
+    .demo-controls {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(30, 30, 50, 0.95);
+      border: 1px solid #3a3a5c;
+      border-radius: 12px;
+      padding: 20px 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+    }
+
+    .demo-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .demo-buttons {
+      display: flex;
+      gap: 12px;
+    }
+
+    .demo-btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .demo-btn.trigger-rona {
+      background: linear-gradient(135deg, #ff0a0a, #8b0000);
+      color: #fff;
+    }
+
+    .demo-btn.trigger-rona:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(255, 10, 10, 0.5);
+    }
+
+    .demo-btn.reset {
+      background: linear-gradient(135deg, #00ff88, #00aa55);
+      color: #000;
+    }
+
+    .demo-btn.reset:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+    }
+
+    .demo-note {
+      font-size: 11px;
+      color: #6a6a8a;
+      text-align: center;
+      max-width: 400px;
+    }
+
+    /* Main content area placeholder */
+    .main-content {
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .placeholder-card {
+      background: rgba(30, 30, 50, 0.5);
+      border: 1px solid #3a3a5c;
+      border-radius: 12px;
+      padding: 40px;
+      width: 100%;
+      max-width: 800px;
+      text-align: center;
+    }
+
+    .placeholder-card h2 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #00bceb;
+    }
+
+    .placeholder-card p {
+      color: #8a8aaa;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Simulated Webex Contact Center Desktop Header -->
+  <header class="desktop-header">
+    <div class="header-left">
+      <div class="webex-logo">WEBEX</div>
+      <div class="header-divider"></div>
+      <div class="agent-info">
+        <div class="agent-avatar">JD</div>
+        <div class="agent-details">
+          <span class="agent-name">John Doe</span>
+          <span class="agent-id">Agent ID: 12345</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <!-- Placeholder for other header items -->
+    </div>
+  </header>
+
+  <!-- Advanced Header - Widget placement area -->
+  <div class="advanced-header">
+    <span class="advanced-header-label">Advanced Header</span>
+    
+    <!-- OUR RONA COUNTDOWN WIDGET -->
+    <rona-countdown-widget></rona-countdown-widget>
+  </div>
+
+  <!-- Main content placeholder -->
+  <main class="main-content">
+    <div class="placeholder-card">
+      <h2>Agent Desktop Workspace</h2>
+      <p>This is a demo environment simulating the Webex Contact Center Agent Desktop.<br>
+      Use the controls below to trigger a RONA state and see the dramatic countdown in action!</p>
+    </div>
+  </main>
+
+  <!-- Demo Controls -->
+  <div class="demo-controls">
+    <div class="demo-title">🎬 Demo Controls</div>
+    <div class="demo-buttons">
+      <button class="demo-btn trigger-rona" onclick="triggerRona()">
+        🚨 Trigger RONA
+      </button>
+      <button class="demo-btn reset" onclick="resetWidget()">
+        ✓ Reset to Available
+      </button>
+    </div>
+    <p class="demo-note">
+      In production, the widget automatically detects RONA state from the Desktop SDK.<br>
+      Double-click the widget to trigger RONA in demo mode.
+    </p>
+  </div>
+
+  <!-- Load the widget -->
+  <script type="module" src="./rona-countdown-widget.js"></script>
+  
+  <script>
+    // Demo control functions
+    function triggerRona() {
+      const widget = document.querySelector('rona-countdown-widget');
+      if (widget) {
+        // Access the private method for demo purposes
+        widget._triggerRona();
+      }
+    }
+
+    function resetWidget() {
+      const widget = document.querySelector('rona-countdown-widget');
+      if (widget) {
+        widget._cancelRona();
+        widget._currentAgentState = 'Available';
+        widget.requestUpdate();
+      }
+    }
+  </script>
+</body>
+</html>

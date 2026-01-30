@@ -1,0 +1,28 @@
+{
+  "name": "rona-countdown-widget",
+  "version": "1.0.0",
+  "description": "Dramatic RONA countdown widget for Webex Contact Center",
+  "main": "dist/rona-countdown-widget.js",
+  "scripts": {
+    "build": "rollup -c",
+    "watch": "rollup -c -w",
+    "serve": "npx http-server dist -p 8080 --cors"
+  },
+  "keywords": [
+    "webex",
+    "contact-center",
+    "widget",
+    "rona"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "lit": "^3.1.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "rollup": "^4.9.0",
+    "typescript": "^5.3.0"
+  }
+}
