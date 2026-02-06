@@ -446,37 +446,34 @@ class RonaCountdownWidget extends LitElement {
     this.requestUpdate();
   }
 
-  async _recoverFromRona() {
-    try {
-      // The SDK stateChange requires specific format
-      // auxCodeId '0' is typically used for Available state
-      this._sdkLogger?.info('Attempting auto-recovery to Available state...');
-      
-      await Desktop.agentStateInfo.stateChange({
-        state: 'Available',
-        auxCodeId: '0'
-      });
-      
-      this._sdkLogger?.info('Successfully auto-recovered from RONA to Available');
-    } catch (err) {
-      this._sdkLogger?.error(`Auto-recovery failed: ${err.message}`);
-      console.error('[RONA Widget] Recovery error:', err);
-      
-      // If state change fails, just reset the widget UI
-      // The agent will need to manually change state
-      this._sdkLogger?.info('Agent will need to manually change state to Available');
-    }
-
-    this._isRona = false;
-    this._showRecoveryMessage = true;
-
-    setTimeout(() => {
-      this._showRecoveryMessage = false;
-      this.requestUpdate();
-    }, 3000);
-
-    this.requestUpdate();
+async _recoverFromRona() {
+  try {
+    this._sdkLogger?.info('Attempting auto-recovery to Available state...');
+    
+    await Desktop.agentStateInfo.stateChange({
+      state: 'Available',
+      auxCodeIdArray: '0'  // Use auxCodeIdArray as string '0' for Available
+    });
+    
+    this._sdkLogger?.info('Successfully auto-recovered from RONA to Available');
+  } catch (err) {
+    this._sdkLogger?.error(`Auto-recovery failed: ${err.message}`);
+    console.error('[RONA Widget] Recovery error:', err);
+    
+    // Fallback: Reset UI only; agent must manually recover
+    this._sdkLogger?.info('Agent will need to manually change state to Available');
   }
+
+  this._isRona = false;
+  this._showRecoveryMessage = true;
+
+  setTimeout(() => {
+    this._showRecoveryMessage = false;
+    this.requestUpdate();
+  }, 3000);
+
+  this.requestUpdate();
+}
 
   _cancelRona() {
     if (this._countdownInterval) {
