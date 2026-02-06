@@ -19,8 +19,8 @@ class RonaCountdownWidget extends LitElement {
       background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
       border-radius: 6px;
       border: 1px solid #3a3a5c;
-      height: 32px;
-      max-height: 32px;
+      height: 48px;
+      max-height: 48px;
       box-sizing: border-box;
       color: white;
       position: relative;
@@ -300,43 +300,77 @@ class RonaCountdownWidget extends LitElement {
         this._triggerRona();
       }
 
-      // Listen for state changes - try the 'updated' event which is more common
+      // Listen for state changes - the event data is an array of changes
       Desktop.agentStateInfo.addEventListener('updated', (event) => {
         this._sdkLogger.info('State update event received: ' + JSON.stringify(event));
         
-        // Handle both direct data and nested data structures
-        const data = event?.data || event;
-        const newState = data?.subStatus || data?.status || data?.state || 'Unknown';
+        // Event is an array of change objects like [{name: "subStatus", value: "Idle", oldValue: "Available"}, ...]
+        let newState = null;
         
-        this._currentAgentState = newState;
-        this._sdkLogger.info(`Agent state changed to: ${newState}`);
-
-        if (this._isRonaState(newState)) {
-          this._triggerRona();
-        } else if (this._isRona) {
-          this._cancelRona();
+        if (Array.isArray(event)) {
+          // Find the subStatus or status change in the array
+          const stateChange = event.find(item => item.name === 'subStatus' || item.name === 'status' || item.name === 'state');
+          if (stateChange) {
+            newState = stateChange.value;
+          }
+        } else if (event?.data && Array.isArray(event.data)) {
+          const stateChange = event.data.find(item => item.name === 'subStatus' || item.name === 'status' || item.name === 'state');
+          if (stateChange) {
+            newState = stateChange.value;
+          }
+        } else {
+          // Fallback to old parsing method
+          const data = event?.data || event;
+          newState = data?.subStatus || data?.status || data?.state;
         }
+        
+        if (newState) {
+          this._currentAgentState = newState;
+          this._sdkLogger.info(`Agent state changed to: ${newState}`);
 
-        this.requestUpdate();
+          if (this._isRonaState(newState)) {
+            this._triggerRona();
+          } else if (this._isRona) {
+            this._cancelRona();
+          }
+
+          this.requestUpdate();
+        }
       });
 
       // Also try eAgentStateChange event as backup
       Desktop.agentStateInfo.addEventListener('eAgentStateChange', (event) => {
         this._sdkLogger.info('eAgentStateChange event received: ' + JSON.stringify(event));
         
-        const data = event?.data || event;
-        const newState = data?.subStatus || data?.status || data?.state || 'Unknown';
+        let newState = null;
         
-        this._currentAgentState = newState;
-        this._sdkLogger.info(`Agent state changed (eAgentStateChange) to: ${newState}`);
-
-        if (this._isRonaState(newState)) {
-          this._triggerRona();
-        } else if (this._isRona) {
-          this._cancelRona();
+        if (Array.isArray(event)) {
+          const stateChange = event.find(item => item.name === 'subStatus' || item.name === 'status' || item.name === 'state');
+          if (stateChange) {
+            newState = stateChange.value;
+          }
+        } else if (event?.data && Array.isArray(event.data)) {
+          const stateChange = event.data.find(item => item.name === 'subStatus' || item.name === 'status' || item.name === 'state');
+          if (stateChange) {
+            newState = stateChange.value;
+          }
+        } else {
+          const data = event?.data || event;
+          newState = data?.subStatus || data?.status || data?.state;
         }
+        
+        if (newState) {
+          this._currentAgentState = newState;
+          this._sdkLogger.info(`Agent state changed (eAgentStateChange) to: ${newState}`);
 
-        this.requestUpdate();
+          if (this._isRonaState(newState)) {
+            this._triggerRona();
+          } else if (this._isRona) {
+            this._cancelRona();
+          }
+
+          this.requestUpdate();
+        }
       });
 
       this.requestUpdate();
@@ -364,9 +398,9 @@ class RonaCountdownWidget extends LitElement {
 
   _isRonaState(state) {
     if (!state) return false;
-    const upper = state.toUpperCase();
-    // Check for both RONA and NotResponding
-    return upper === 'RONA' || upper === 'NOTRESPONDING' || upper === 'NOT_RESPONDING';
+    const upper = String(state).toUpperCase();
+    // Check for RONA, NotResponding, and Idle variations that might indicate RONA
+    return upper === 'RONA' || upper === 'NOTRESPONDING' || upper === 'NOT_RESPONDING' || upper === 'NOT RESPONDING';
   }
 
   _triggerRona() {
