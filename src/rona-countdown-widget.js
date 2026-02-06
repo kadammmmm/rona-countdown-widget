@@ -35,10 +35,6 @@ class RonaCountdownWidget extends LitElement {
       animation: containerPulse 0.5s ease-in-out infinite alternate;
     }
 
-    .widget-container.rona-active.shake {
-      animation: containerPulse 0.5s ease-in-out infinite alternate, shake 0.1s linear infinite;
-    }
-
     .widget-container.recovery {
       background: linear-gradient(135deg, #0a2a0a 0%, #051a05 100%);
       border-color: #00ff88;
@@ -48,12 +44,6 @@ class RonaCountdownWidget extends LitElement {
     @keyframes containerPulse {
       from { border-color: #ff0a0a; box-shadow: 0 0 12px rgba(255, 10, 10, 0.5); }
       to { border-color: #ff6600; box-shadow: 0 0 18px rgba(255, 102, 0, 0.6); }
-    }
-
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-2px); }
-      75% { transform: translateX(2px); }
     }
 
     /* Status dot */
@@ -248,7 +238,6 @@ class RonaCountdownWidget extends LitElement {
   static properties = {
     _isRona: { type: Boolean },
     _countdown: { type: Number },
-    _isShaking: { type: Boolean },
     _dramaMeter: { type: Number },
     _showRecoveryMessage: { type: Boolean },
     _currentAgentState: { type: String },
@@ -259,7 +248,6 @@ class RonaCountdownWidget extends LitElement {
     super();
     this._isRona = false;
     this._countdown = 0;
-    this._isShaking = false;
     this._dramaMeter = 0;
     this._showRecoveryMessage = false;
     this._currentAgentState = 'Loading...';
@@ -435,7 +423,6 @@ class RonaCountdownWidget extends LitElement {
     this._isRona = true;
     this._countdown = 30;
     this._dramaMeter = 0;
-    this._isShaking = true;
     this._showRecoveryMessage = false;
 
     this._playAlertSound();
@@ -445,7 +432,6 @@ class RonaCountdownWidget extends LitElement {
       this._dramaMeter = Math.min(this._dramaMeter + 1, 10);
 
       if (this._countdown <= 10 && this._countdown > 0) {
-        this._isShaking = true;
         this._playTickSound();
       }
 
@@ -462,18 +448,30 @@ class RonaCountdownWidget extends LitElement {
 
   async _recoverFromRona() {
     try {
+      // The SDK stateChange requires specific format
+      // Try different approaches based on what the API expects
+      this._sdkLogger?.info('Attempting auto-recovery to Available state...');
+      
+      // Get available idle codes to find Available state
+      const latestData = Desktop.agentStateInfo.latestData;
+      this._sdkLogger?.info('Latest data for recovery: ' + JSON.stringify(latestData));
+      
+      // Try the stateChange with just the state name
       await Desktop.agentStateInfo.stateChange({
-        state: 'Available',
-        auxCodeId: null
+        state: 'Available'
       });
+      
       this._sdkLogger?.info('Successfully auto-recovered from RONA to Available');
     } catch (err) {
       this._sdkLogger?.error(`Auto-recovery failed: ${err.message}`);
       console.error('[RONA Widget] Recovery error:', err);
+      
+      // If state change fails, just reset the widget UI
+      // The agent will need to manually change state
+      this._sdkLogger?.info('Agent will need to manually change state to Available');
     }
 
     this._isRona = false;
-    this._isShaking = false;
     this._showRecoveryMessage = true;
 
     setTimeout(() => {
@@ -490,7 +488,6 @@ class RonaCountdownWidget extends LitElement {
       this._countdownInterval = null;
     }
     this._isRona = false;
-    this._isShaking = false;
     this._dramaMeter = 0;
     this._showRecoveryMessage = false;
     this.requestUpdate();
@@ -537,7 +534,6 @@ class RonaCountdownWidget extends LitElement {
     return html`
       <div class="widget-container 
         ${this._isRona ? 'rona-active' : ''} 
-        ${this._isShaking ? 'shake' : ''} 
         ${this._showRecoveryMessage ? 'recovery' : ''}">
 
         <div class="scanlines"></div>
