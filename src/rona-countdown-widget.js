@@ -1,593 +1,427 @@
 import { LitElement, html, css } from 'lit';
 
-/**
- * RONA Countdown Widget for Webex Contact Center
- * 
- * A dramatically over-the-top countdown timer that activates when an agent
- * enters RONA (Redirection on No Answer) state. Designed to fit within the
- * 48px Advanced Header constraint while still being dramatic and attention-grabbing.
- * 
- * @element rona-countdown-widget
- */
-class RonaCountdownWidget extends LitElement {
-  static properties = {
-    _isRona: { state: true },
-    _countdown: { state: true },
-    _isShaking: { state: true },
-    _dramaMeter: { state: true },
-    _currentAgentState: { state: true },
-    _showRecoveryMessage: { state: true }
-  };
+const getDesktopSDK = () => {
+  if (window.WxccDesktopSDK) {
+    return window.WxccDesktopSDK;
+  }
+  if (window.Desktop) {  // Sometimes aliased
+    return window.Desktop;
+  }
+  throw new Error('WxCC Desktop SDK not available - running in demo mode?');
+};
 
+class RonaCountdownWidget extends LitElement {
   static styles = css`
     :host {
       display: block;
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      --danger-red: #ff0a0a;
-      --danger-red-dark: #8b0000;
-      --warning-orange: #ff6600;
-      --warning-yellow: #ffcc00;
-      --safe-green: #00ff88;
-      --background-dark: #1a1a2e;
-      --text-glow: 0 0 8px currentColor, 0 0 16px currentColor;
-      height: 100%;
-      max-height: 48px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
-    /* Main container - fits within 48px header */
     .widget-container {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 12px;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      border-radius: 6px;
-      border: 1px solid #2a2a4e;
-      height: 36px;
-      max-height: 36px;
-      box-sizing: border-box;
-      transition: all 0.3s ease;
+      width: 220px;
+      height: 80px;
+      background: rgba(30, 30, 50, 0.85);
+      border-radius: 12px;
+      border: 1px solid #3a3a5c;
+      color: white;
       overflow: hidden;
+      position: relative;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      transition: all 0.3s ease;
     }
 
-    /* RONA Active State - Dramatic but contained */
     .widget-container.rona-active {
-      background: linear-gradient(135deg, #4a0a0a 0%, #2a0505 100%);
-      border-color: var(--danger-red);
-      box-shadow: 
-        0 0 15px rgba(255, 10, 10, 0.6),
-        0 0 30px rgba(255, 10, 10, 0.3),
-        inset 0 0 15px rgba(255, 10, 10, 0.2);
-      animation: containerPulse 0.5s ease-in-out infinite alternate;
+      background: linear-gradient(135deg, #8b0000, #ff0a0a);
+      animation: pulse 2s infinite;
     }
 
-    .widget-container.rona-active.shake {
-      animation: containerPulse 0.5s ease-in-out infinite alternate, shake 0.1s linear infinite;
+    .widget-container.shake {
+      animation: shake 0.5s;
     }
 
     .widget-container.recovery {
-      background: linear-gradient(135deg, #0a2a0a 0%, #051a05 100%);
-      border-color: var(--safe-green);
-      box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+      background: linear-gradient(135deg, #006400, #00ff88);
+      animation: successPulse 1.5s;
     }
 
-    @keyframes containerPulse {
-      from {
-        border-color: var(--danger-red);
-        box-shadow: 
-          0 0 15px rgba(255, 10, 10, 0.6),
-          0 0 30px rgba(255, 10, 10, 0.3);
-      }
-      to {
-        border-color: var(--warning-orange);
-        box-shadow: 
-          0 0 20px rgba(255, 102, 0, 0.7),
-          0 0 40px rgba(255, 10, 10, 0.4);
-      }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+      100% { transform: scale(1); }
     }
 
     @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-2px); }
-      75% { transform: translateX(2px); }
+      0% { transform: translate(1px, 1px) rotate(0deg); }
+      10% { transform: translate(-1px, -2px) rotate(-1deg); }
+      20% { transform: translate(-3px, 0px) rotate(1deg); }
+      30% { transform: translate(3px, 2px) rotate(0deg); }
+      40% { transform: translate(1px, -1px) rotate(1deg); }
+      50% { transform: translate(-1px, 2px) rotate(-1deg); }
+      60% { transform: translate(-3px, 1px) rotate(0deg); }
+      70% { transform: translate(3px, 1px) rotate(-1deg); }
+      80% { transform: translate(-1px, -1px) rotate(1deg); }
+      90% { transform: translate(1px, 2px) rotate(0deg); }
+      100% { transform: translate(1px, -2px) rotate(-1deg); }
     }
 
-    /* Alert Icon */
+    @keyframes successPulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,255,136,0.7); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(0,255,136,0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,255,136,0); }
+    }
+
+    .scanlines {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(255,255,255,0.03) 1px,
+        transparent 2px
+      );
+      pointer-events: none;
+      animation: scan 8s linear infinite;
+    }
+
+    @keyframes scan {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100%); }
+    }
+
     .alert-icon {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      flex-shrink: 0;
+      position: absolute;
+      top: 12px;
+      left: 16px;
+      width: 48px;
+      height: 48px;
     }
 
-    .status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--safe-green);
-      box-shadow: 0 0 6px var(--safe-green);
-      transition: all 0.3s ease;
-    }
-
-    .status-dot.rona {
-      width: 12px;
-      height: 12px;
-      background: var(--danger-red);
-      animation: dotPulse 0.3s ease-in-out infinite alternate;
-    }
-
-    .status-dot.recovery {
-      background: var(--safe-green);
-      animation: dotGlow 0.5s ease-in-out infinite;
-    }
-
-    @keyframes dotPulse {
-      from {
-        box-shadow: 0 0 4px var(--danger-red), 0 0 8px var(--danger-red);
-        transform: scale(1);
-      }
-      to {
-        box-shadow: 0 0 8px var(--danger-red), 0 0 16px var(--danger-red), 0 0 24px var(--danger-red);
-        transform: scale(1.15);
-      }
-    }
-
-    @keyframes dotGlow {
-      0%, 100% { box-shadow: 0 0 6px var(--safe-green); }
-      50% { box-shadow: 0 0 12px var(--safe-green), 0 0 20px var(--safe-green); }
-    }
-
-    /* Warning Triangle for RONA */
     .warning-triangle {
       width: 0;
       height: 0;
-      border-left: 12px solid transparent;
-      border-right: 12px solid transparent;
-      border-bottom: 20px solid var(--warning-yellow);
+      border-left: 24px solid transparent;
+      border-right: 24px solid transparent;
+      border-bottom: 42px solid #ffff00;
       position: relative;
-      animation: trianglePulse 0.4s ease-in-out infinite alternate;
-      filter: drop-shadow(0 0 6px var(--warning-yellow));
     }
 
     .warning-triangle::after {
-      content: '!';
+      content: "!";
       position: absolute;
-      top: 5px;
-      left: -3px;
-      font-size: 11px;
-      font-weight: 900;
+      top: 8px;
+      left: -8px;
+      font-size: 28px;
       color: #000;
+      font-weight: bold;
     }
 
-    @keyframes trianglePulse {
-      from { 
-        filter: drop-shadow(0 0 4px var(--warning-yellow));
-        transform: scale(1);
-      }
-      to { 
-        filter: drop-shadow(0 0 10px var(--warning-orange));
-        transform: scale(1.1);
-      }
+    .recovery-check {
+      font-size: 48px;
+      color: #00ff88;
+      animation: checkFade 1.2s;
     }
 
-    /* Countdown Display */
+    @keyframes checkFade {
+      0% { opacity: 0; transform: scale(0.5); }
+      60% { opacity: 1; transform: scale(1.2); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .status-dot {
+      width: 48px;
+      height: 48px;
+      background: #00bceb;
+      border-radius: 50%;
+      box-shadow: 0 0 15px #00bceb;
+    }
+
     .countdown-section {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      position: absolute;
+      top: 10px;
+      left: 70px;
+      font-size: 32px;
+      font-weight: bold;
     }
 
     .countdown-number {
-      font-family: 'Consolas', 'Monaco', monospace;
-      font-size: 22px;
-      font-weight: 900;
-      color: var(--danger-red);
-      text-shadow: var(--text-glow);
-      min-width: 28px;
-      text-align: center;
-      animation: numberPulse 1s ease-in-out infinite;
-    }
-
-    .countdown-number.critical {
-      color: var(--warning-yellow);
-      font-size: 24px;
-      animation: numberCritical 0.2s ease-in-out infinite alternate;
+      color: #ffff00;
     }
 
     .countdown-number.danger {
-      color: #ff0000;
-      animation: numberDanger 0.15s linear infinite;
+      color: #ff0a0a;
+      animation: flash 0.8s infinite;
     }
 
-    @keyframes numberPulse {
+    .countdown-number.critical {
+      color: #ff6600;
+      animation: flash 0.6s infinite;
+    }
+
+    @keyframes flash {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.85; }
-    }
-
-    @keyframes numberCritical {
-      from { 
-        transform: scale(1);
-        text-shadow: 0 0 8px var(--warning-yellow), 0 0 16px var(--warning-orange);
-      }
-      to { 
-        transform: scale(1.08);
-        text-shadow: 0 0 12px var(--warning-yellow), 0 0 24px var(--danger-red);
-      }
-    }
-
-    @keyframes numberDanger {
-      0%, 100% { transform: scale(1); filter: brightness(1); }
-      50% { transform: scale(1.05); filter: brightness(1.3); }
+      50% { opacity: 0.4; }
     }
 
     .countdown-unit {
-      font-size: 10px;
-      font-weight: 600;
-      color: rgba(255, 100, 100, 0.9);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      font-size: 16px;
+      vertical-align: super;
     }
 
-    /* Status Label */
     .status-label {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #8a8aaa;
-      white-space: nowrap;
+      position: absolute;
+      bottom: 12px;
+      left: 70px;
+      font-size: 16px;
+      font-weight: 600;
     }
 
     .status-label.rona {
-      color: var(--danger-red);
-      text-shadow: 0 0 8px rgba(255, 10, 10, 0.8);
-      animation: labelBlink 0.5s ease-in-out infinite alternate;
+      color: #ffff00;
     }
 
     .status-label.recovery {
-      color: var(--safe-green);
-      text-shadow: 0 0 8px rgba(0, 255, 136, 0.8);
+      color: #00ff88;
+      font-size: 20px;
     }
 
-    @keyframes labelBlink {
-      from { opacity: 0.7; }
-      to { opacity: 1; }
+    .drama-meter {
+      position: absolute;
+      bottom: 8px;
+      right: 12px;
+      display: flex;
+      gap: 4px;
     }
 
-    /* Progress Bar (fits at bottom of container) */
+    .drama-dot {
+      width: 8px;
+      height: 8px;
+      background: #444;
+      border-radius: 50%;
+      transition: all 0.3s;
+    }
+
+    .drama-dot.active {
+      background: #ffff00;
+      box-shadow: 0 0 8px #ffff00;
+    }
+
+    .drama-dot.critical {
+      background: #ff0a0a;
+      box-shadow: 0 0 12px #ff0a0a;
+    }
+
     .progress-bar {
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
-      height: 3px;
-      background: rgba(255, 255, 255, 0.1);
-      overflow: hidden;
+      height: 4px;
+      background: rgba(0,0,0,0.5);
     }
 
     .progress-fill {
       height: 100%;
-      background: linear-gradient(90deg, var(--danger-red), var(--warning-orange), var(--warning-yellow));
+      background: #ffff00;
       transition: width 1s linear;
-      box-shadow: 0 0 8px var(--danger-red);
     }
 
     .progress-fill.critical {
-      background: linear-gradient(90deg, var(--warning-yellow), var(--danger-red));
-      animation: progressPulse 0.3s ease-in-out infinite alternate;
-    }
-
-    @keyframes progressPulse {
-      from { box-shadow: 0 0 8px var(--warning-yellow); }
-      to { box-shadow: 0 0 16px var(--danger-red); }
-    }
-
-    /* Drama Meter - Small dots */
-    .drama-meter {
-      display: flex;
-      gap: 2px;
-      margin-left: 4px;
-    }
-
-    .drama-dot {
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: #333;
-      transition: all 0.3s ease;
-    }
-
-    .drama-dot.active {
-      background: var(--danger-red);
-      box-shadow: 0 0 4px var(--danger-red);
-    }
-
-    .drama-dot.active.critical {
-      background: var(--warning-yellow);
-      box-shadow: 0 0 6px var(--warning-yellow);
-    }
-
-    /* Recovery checkmark */
-    .recovery-check {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: var(--safe-green);
-      color: #000;
-      font-size: 12px;
-      font-weight: 900;
-      animation: checkPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      box-shadow: 0 0 10px var(--safe-green);
-    }
-
-    @keyframes checkPop {
-      from { transform: scale(0); }
-      to { transform: scale(1); }
-    }
-
-    /* Scanline effect overlay - subtle */
-    .scanlines {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        rgba(0, 0, 0, 0.03) 0px,
-        rgba(0, 0, 0, 0.03) 1px,
-        transparent 1px,
-        transparent 2px
-      );
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-
-    .widget-container.rona-active .scanlines {
-      opacity: 1;
-      animation: scanMove 0.1s linear infinite;
-    }
-
-    @keyframes scanMove {
-      from { transform: translateY(0); }
-      to { transform: translateY(2px); }
-    }
-
-    /* Hidden state */
-    .hidden {
-      display: none !important;
+      background: #ff0a0a;
     }
   `;
+
+  static properties = {
+    _isRona: { type: Boolean },
+    _countdown: { type: Number },
+    _isShaking: { type: Boolean },
+    _dramaMeter: { type: Number },
+    _showRecoveryMessage: { type: Boolean },
+    _currentAgentState: { type: String },
+    _isDemo: { type: Boolean },
+  };
 
   constructor() {
     super();
     this._isRona = false;
-    this._countdown = 30;
+    this._countdown = 0;
     this._isShaking = false;
     this._dramaMeter = 0;
-    this._currentAgentState = 'Unknown';
     this._showRecoveryMessage = false;
+    this._currentAgentState = 'Loading...';
+    this._isDemo = false;
     this._countdownInterval = null;
-    this._recoveryTimeout = null;
-    this._desktop = null;
+    this._sdkLogger = null;
   }
 
   connectedCallback() {
     super.connectedCallback();
-    this._initializeDesktopSDK();
+    this._initSDK();
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    this._cleanup();
+    if (this._countdownInterval) clearInterval(this._countdownInterval);
+    // Cleanup SDK listeners if needed
   }
 
-  async _initializeDesktopSDK() {
-    try {
-      // Wait for Desktop SDK to be available
-      if (typeof window.WCC === 'undefined' || typeof window.WCC.Desktop === 'undefined') {
-        console.log('[RONA Widget] Waiting for Desktop SDK...');
-        await this._waitForDesktopSDK();
-      }
+async _initSDK() {
+  try {
+    const SDK = getDesktopSDK();  // Get the global
+    this._sdkLogger = SDK.logger.createLogger('rona-countdown-widget');
 
-      this._desktop = window.WCC.Desktop;
-      
-      // Initialize the Desktop SDK
-      await this._desktop.agentContact.init();
-      console.log('[RONA Widget] Desktop SDK initialized');
+    // Initialize the SDK
+    await SDK.config.init();
+    this._sdkLogger.info('Desktop SDK initialized successfully');
 
-      // Subscribe to agent state changes
-      this._desktop.agentStateInfo.addEventListener('updated', (data) => {
-        this._handleAgentStateChange(data);
-      });
+    // Get initial agent state
+    const initialState = SDK.agentStateInfo.latestData?.state || 'Unknown';
+    this._currentAgentState = initialState;
+    this._sdkLogger.info(`Initial agent state: ${initialState}`);
 
-      // Get initial agent state
-      const initialState = await this._desktop.agentStateInfo.latestData;
-      if (initialState) {
-        this._currentAgentState = initialState.subStatus || initialState.status || 'Unknown';
-        console.log('[RONA Widget] Initial state:', this._currentAgentState);
-      }
-
-    } catch (error) {
-      console.error('[RONA Widget] SDK initialization error:', error);
-      // Fallback for testing - demo mode
-      this._setupDemoMode();
-    }
-  }
-
-  _waitForDesktopSDK(timeout = 10000) {
-    return new Promise((resolve, reject) => {
-      const startTime = Date.now();
-      const checkSDK = () => {
-        if (typeof window.WCC !== 'undefined' && typeof window.WCC.Desktop !== 'undefined') {
-          resolve();
-        } else if (Date.now() - startTime > timeout) {
-          reject(new Error('Desktop SDK not available'));
-        } else {
-          setTimeout(checkSDK, 100);
-        }
-      };
-      checkSDK();
-    });
-  }
-
-  _setupDemoMode() {
-    console.log('[RONA Widget] Running in demo mode');
-    // Add click handler for demo purposes
-    this.addEventListener('dblclick', () => {
-      if (!this._isRona) {
-        this._triggerRona();
-      }
-    });
-  }
-
-  _handleAgentStateChange(data) {
-    const newState = data.subStatus || data.status || 'Unknown';
-    console.log('[RONA Widget] State changed:', this._currentAgentState, '->', newState);
-    
-    this._currentAgentState = newState;
-
-    // Check if entering RONA state
-    if (newState.toUpperCase() === 'RONA' && !this._isRona) {
+    // Check if already in RONA
+    if (this._isRonaState(initialState)) {
       this._triggerRona();
     }
-    // Check if leaving RONA state manually
-    else if (this._isRona && newState.toUpperCase() !== 'RONA') {
-      this._cancelRona();
+
+    // Listen for state changes
+    SDK.agentStateInfo.addEventListener('eAgentStateChange', (event) => {
+      const newState = event.data?.state || 'Unknown';
+      this._currentAgentState = newState;
+      this._sdkLogger.info(`Agent state changed to: ${newState}`);
+
+      if (this._isRonaState(newState)) {
+        this._triggerRona();
+      } else if (this._isRona) {
+        this._cancelRona();
+      }
+
+      this.requestUpdate();
+    });
+
+  } catch (err) {
+    console.error('[RONA Widget] SDK error:', err);
+    this._enterDemoMode();
+  }
+
+  // Safety fallback...
+  setTimeout(() => {
+    if (this._currentAgentState === 'Loading...') {
+      this._enterDemoMode();
     }
+  }, 10000);
+}
+
+  _enterDemoMode() {
+    this._isDemo = true;
+    this._currentAgentState = 'Available (Demo)';
+    this.requestUpdate();
+    console.warn('[RONA Widget] Entered demo mode - SDK not detected');
+  }
+
+  _isRonaState(state) {
+    // WxCC SDK reports 'NotResponding' for RONA (Redirection on No Answer)
+    // UI may show "RONA" or "Idle - RONA", but backend state is 'NotResponding'
+    return state?.toUpperCase() === 'NOTRESPONDING';
   }
 
   _triggerRona() {
-    console.log('[RONA Widget] RONA TRIGGERED! Starting countdown...');
+    if (this._isRona) return;
+
     this._isRona = true;
     this._countdown = 30;
     this._dramaMeter = 0;
-    this._isShaking = false;
+    this._isShaking = true;
+    this._showRecoveryMessage = false;
 
-    // Play alert sound if available
     this._playAlertSound();
 
-    // Start countdown
     this._countdownInterval = setInterval(() => {
       this._countdown--;
-      
-      // Increase drama as time runs out
-      this._dramaMeter = Math.floor((30 - this._countdown) / 3);
-      
-      // Start shaking at 10 seconds
-      if (this._countdown <= 10) {
-        this._isShaking = true;
-      }
 
-      // Play tick sound for last 10 seconds
+      // Escalate drama
+      this._dramaMeter = Math.min(this._dramaMeter + 1, 10);
+
       if (this._countdown <= 10 && this._countdown > 0) {
         this._playTickSound();
       }
 
       if (this._countdown <= 0) {
-        this._autoRecover();
+        clearInterval(this._countdownInterval);
+        this._recoverFromRona();
       }
 
       this.requestUpdate();
     }, 1000);
+
+    this.requestUpdate();
   }
 
-  async _autoRecover() {
-    console.log('[RONA Widget] Auto-recovering to Available state...');
-    this._cleanup();
-    
-    try {
-      // Attempt to set agent state to Available
-      if (this._desktop) {
-        await this._desktop.agentStateInfo.stateChange({
-          state: 'Available',
-          auxCodeId: null
-        });
-        console.log('[RONA Widget] Successfully set state to Available');
-      }
-    } catch (error) {
-      console.error('[RONA Widget] Failed to auto-recover:', error);
-    }
+  async _recoverFromRona() {
+  try {
+    const SDK = getDesktopSDK();
+    await SDK.agentStateInfo.stateChange({
+      state: 'Available',
+      auxCodeId: null,
+    });
+    this._sdkLogger?.info('Auto-recovered from RONA to Available');
+  } catch (err) {
+    this._sdkLogger?.error(`Auto-recovery failed: ${err.message}`);
+    console.error('[RONA Widget] Recovery error:', err);
+  }
 
-    // Show recovery animation
-    this._showRecoveryMessage = true;
     this._isRona = false;
-    this.requestUpdate();
+    this._isShaking = false;
+    this._showRecoveryMessage = true;
 
-    // Hide recovery message after 3 seconds
-    this._recoveryTimeout = setTimeout(() => {
+    setTimeout(() => {
       this._showRecoveryMessage = false;
       this.requestUpdate();
-    }, 3000);
+    }, 4000);
+
+    this.requestUpdate();
   }
 
   _cancelRona() {
-    console.log('[RONA Widget] RONA cancelled - agent changed state manually');
-    this._cleanup();
-    this._isRona = false;
-    this._showRecoveryMessage = false;
-    this.requestUpdate();
-  }
-
-  _cleanup() {
     if (this._countdownInterval) {
       clearInterval(this._countdownInterval);
       this._countdownInterval = null;
     }
-    if (this._recoveryTimeout) {
-      clearTimeout(this._recoveryTimeout);
-      this._recoveryTimeout = null;
-    }
+    this._isRona = false;
+    this._isShaking = false;
+    this._dramaMeter = 0;
+    this._showRecoveryMessage = false;
+    this.requestUpdate();
   }
 
   _playAlertSound() {
     try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
       oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
-      oscillator.frequency.setValueAtTime(440, audioContext.currentTime + 0.1);
-      oscillator.frequency.setValueAtTime(880, audioContext.currentTime + 0.2);
-      
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-      
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.3);
+      gainNode.connect(audioCtx.destination);
+      oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.05);
     } catch (e) {
-      console.log('[RONA Widget] Audio not available');
+      console.warn('Audio context error:', e);
     }
   }
 
   _playTickSound() {
     try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
       oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
-      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
-      
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.05);
-    } catch (e) {
-      // Audio not available
-    }
+      gainNode.connect(audioCtx.destination);
+      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.08);
+    } catch (e) {}
   }
 
   _getCountdownClass() {
@@ -604,52 +438,49 @@ class RonaCountdownWidget extends LitElement {
   }
 
   render() {
-    const progressWidth = this._isRona ? ((30 - this._countdown) / 30) * 100 : 0;
-    
+    const progress = this._isRona ? (30 - this._countdown) / 30 * 100 : 0;
+
     return html`
-      <div class="widget-container ${this._isRona ? 'rona-active' : ''} ${this._isShaking ? 'shake' : ''} ${this._showRecoveryMessage ? 'recovery' : ''}">
-        
-        <!-- Scanlines overlay for RONA state -->
-        <div class="scanlines"></div>
-        
-        <!-- Icon Section -->
+      <div class="widget-container 
+        ${this._isRona ? 'rona-active' : ''} 
+        ${this._isShaking ? 'shake' : ''} 
+        ${this._showRecoveryMessage ? 'recovery' : ''}">
+
+        ${this._isRona ? html`<div class="scanlines"></div>` : ''}
+
         <div class="alert-icon">
-          ${this._isRona ? html`
-            <div class="warning-triangle"></div>
-          ` : this._showRecoveryMessage ? html`
-            <div class="recovery-check">✓</div>
-          ` : html`
-            <div class="status-dot"></div>
-          `}
+          ${this._isRona 
+            ? html`<div class="warning-triangle"></div>`
+            : this._showRecoveryMessage 
+              ? html`<div class="recovery-check">✓</div>`
+              : html`<div class="status-dot"></div>`}
         </div>
 
-        <!-- Content Section -->
         ${this._isRona ? html`
-          <!-- RONA Active: Show countdown -->
           <div class="countdown-section">
             <span class="countdown-number ${this._getCountdownClass()}">${this._countdown}</span>
             <span class="countdown-unit">sec</span>
           </div>
           <span class="status-label rona">RONA</span>
-          
-          <!-- Drama meter dots -->
+
           <div class="drama-meter">
             ${[...Array(5)].map((_, i) => html`
-              <div class="drama-dot ${i < Math.ceil(this._dramaMeter / 2) ? 'active' : ''} ${this._countdown <= 10 ? 'critical' : ''}"></div>
+              <div class="drama-dot 
+                ${i < Math.ceil(this._dramaMeter / 2) ? 'active' : ''} 
+                ${this._countdown <= 10 ? 'critical' : ''}">
+              </div>
             `)}
           </div>
         ` : this._showRecoveryMessage ? html`
-          <!-- Recovery: Show success -->
           <span class="status-label recovery">RECOVERED!</span>
         ` : html`
-          <!-- Normal: Show current state -->
           <span class="status-label">${this._currentAgentState}</span>
         `}
 
-        <!-- Progress bar at bottom -->
         ${this._isRona ? html`
           <div class="progress-bar">
-            <div class="progress-fill ${this._countdown <= 10 ? 'critical' : ''}" style="width: ${progressWidth}%"></div>
+            <div class="progress-fill ${this._countdown <= 10 ? 'critical' : ''}" 
+                 style="width: ${progress}%"></div>
           </div>
         ` : ''}
       </div>
@@ -658,5 +489,3 @@ class RonaCountdownWidget extends LitElement {
 }
 
 customElements.define('rona-countdown-widget', RonaCountdownWidget);
-
-export default RonaCountdownWidget;
