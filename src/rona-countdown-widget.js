@@ -449,16 +449,12 @@ class RonaCountdownWidget extends LitElement {
   async _recoverFromRona() {
     try {
       // The SDK stateChange requires specific format
-      // Try different approaches based on what the API expects
+      // auxCodeId '0' is typically used for Available state
       this._sdkLogger?.info('Attempting auto-recovery to Available state...');
       
-      // Get available idle codes to find Available state
-      const latestData = Desktop.agentStateInfo.latestData;
-      this._sdkLogger?.info('Latest data for recovery: ' + JSON.stringify(latestData));
-      
-      // Try the stateChange with just the state name
       await Desktop.agentStateInfo.stateChange({
-        state: 'Available'
+        state: 'Available',
+        auxCodeId: '0'
       });
       
       this._sdkLogger?.info('Successfully auto-recovered from RONA to Available');
