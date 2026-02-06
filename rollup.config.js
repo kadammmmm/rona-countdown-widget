@@ -1,4 +1,5 @@
 import resolve from '@rollup/plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
 import terser from '@rollup/plugin-terser';
 
 export default {
@@ -11,6 +12,7 @@ export default {
   },
   plugins: [
     resolve(),
+    commonjs(),  // <-- This fixes UMD/export issues with @wxcc-desktop/sdk
     terser()
   ]
 };

@@ -1,14 +1,5 @@
 import { LitElement, html, css } from 'lit';
-
-const getDesktopSDK = () => {
-  if (window.WxccDesktopSDK) {
-    return window.WxccDesktopSDK;
-  }
-  if (window.Desktop) {  // Sometimes aliased
-    return window.Desktop;
-  }
-  throw new Error('WxCC Desktop SDK not available - running in demo mode?');
-};
+import { Desktop } from '@wxcc-desktop/sdk';  // Official named import - confirmed in Cisco docs & samples
 
 class RonaCountdownWidget extends LitElement {
   static styles = css`
@@ -261,66 +252,67 @@ class RonaCountdownWidget extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this._countdownInterval) clearInterval(this._countdownInterval);
-    // Cleanup SDK listeners if needed
   }
 
-async _initSDK() {
-  try {
-    const SDK = getDesktopSDK();  // Get the global
-    this._sdkLogger = SDK.logger.createLogger('rona-countdown-widget');
+  async _initSDK() {
+    try {
+      this._sdkLogger = Desktop.logger.createLogger('rona-countdown-widget');
 
-    // Initialize the SDK
-    await SDK.config.init();
-    this._sdkLogger.info('Desktop SDK initialized successfully');
+      // Initialize SDK - add widget context for better logging/tracking in WxCC
+      await Desktop.config.init({
+        widgetName: 'rona-countdown-widget',
+        widgetProvider: 'bucher-suter'  // Customize if needed
+      });
+      this._sdkLogger.info('WxCC Desktop SDK initialized successfully');
 
-    // Get initial agent state
-    const initialState = SDK.agentStateInfo.latestData?.state || 'Unknown';
-    this._currentAgentState = initialState;
-    this._sdkLogger.info(`Initial agent state: ${initialState}`);
+      // Fetch initial agent state
+      const initialState = Desktop.agentStateInfo.latestData?.state || 'Unknown';
+      this._currentAgentState = initialState;
+      this._sdkLogger.info(`Initial agent state: ${initialState}`);
 
-    // Check if already in RONA
-    if (this._isRonaState(initialState)) {
-      this._triggerRona();
-    }
-
-    // Listen for state changes
-    SDK.agentStateInfo.addEventListener('eAgentStateChange', (event) => {
-      const newState = event.data?.state || 'Unknown';
-      this._currentAgentState = newState;
-      this._sdkLogger.info(`Agent state changed to: ${newState}`);
-
-      if (this._isRonaState(newState)) {
+      if (this._isRonaState(initialState)) {
         this._triggerRona();
-      } else if (this._isRona) {
-        this._cancelRona();
       }
 
-      this.requestUpdate();
-    });
+      // Listen for real-time state changes
+      Desktop.agentStateInfo.addEventListener('eAgentStateChange', (event) => {
+        const newState = event.data?.state || 'Unknown';
+        this._currentAgentState = newState;
+        this._sdkLogger.info(`Agent state changed to: ${newState}`);
 
-  } catch (err) {
-    console.error('[RONA Widget] SDK error:', err);
-    this._enterDemoMode();
-  }
+        if (this._isRonaState(newState)) {
+          this._triggerRona();
+        } else if (this._isRona) {
+          this._cancelRona();
+        }
 
-  // Safety fallback...
-  setTimeout(() => {
-    if (this._currentAgentState === 'Loading...') {
+        this.requestUpdate();
+      });
+
+    } catch (err) {
+      this._sdkLogger?.error(`SDK initialization failed: ${err.message}`);
+      console.error('[RONA Widget] SDK error:', err);
       this._enterDemoMode();
     }
-  }, 10000);
-}
+
+    // Fallback to demo if no SDK activity after 10 seconds
+    setTimeout(() => {
+      if (this._currentAgentState === 'Loading...') {
+        this._enterDemoMode();
+      }
+    }, 10000);
+  }
 
   _enterDemoMode() {
     this._isDemo = true;
-    this._currentAgentState = 'Available (Demo)';
+    this._currentAgentState = 'Available (Demo Mode)';
     this.requestUpdate();
-    console.warn('[RONA Widget] Entered demo mode - SDK not detected');
+    console.warn('[RONA Widget] Entered demo mode - SDK not detected in this environment');
   }
 
   _isRonaState(state) {
-    // WxCC SDK reports 'NotResponding' for RONA (Redirection on No Answer)
-    // UI may show "RONA" or "Idle - RONA", but backend state is 'NotResponding'
+    // Standard WxCC SDK state for RONA (Redirection on No Answer)
+    // UI may display "RONA" but SDK uses 'NotResponding'
     return state?.toUpperCase() === 'NOTRESPONDING';
   }
 
@@ -337,8 +329,6 @@ async _initSDK() {
 
     this._countdownInterval = setInterval(() => {
       this._countdown--;
-
-      // Escalate drama
       this._dramaMeter = Math.min(this._dramaMeter + 1, 10);
 
       if (this._countdown <= 10 && this._countdown > 0) {
@@ -357,17 +347,16 @@ async _initSDK() {
   }
 
   async _recoverFromRona() {
-  try {
-    const SDK = getDesktopSDK();
-    await SDK.agentStateInfo.stateChange({
-      state: 'Available',
-      auxCodeId: null,
-    });
-    this._sdkLogger?.info('Auto-recovered from RONA to Available');
-  } catch (err) {
-    this._sdkLogger?.error(`Auto-recovery failed: ${err.message}`);
-    console.error('[RONA Widget] Recovery error:', err);
-  }
+    try {
+      await Desktop.agentStateInfo.stateChange({
+        state: 'Available',
+        auxCodeId: null  // Use null or fetch default from Desktop.agentStateInfo.latestData.idleCodes if required
+      });
+      this._sdkLogger?.info('Successfully auto-recovered from RONA to Available');
+    } catch (err) {
+      this._sdkLogger?.error(`Auto-recovery failed: ${err.message}`);
+      console.error('[RONA Widget] Recovery error:', err);
+    }
 
     this._isRona = false;
     this._isShaking = false;
@@ -395,32 +384,32 @@ async _initSDK() {
 
   _playAlertSound() {
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime);
-      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
-      oscillator.start(audioCtx.currentTime);
-      oscillator.stop(audioCtx.currentTime + 0.05);
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(1200, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.05);
     } catch (e) {
-      console.warn('Audio context error:', e);
+      console.warn('Audio error:', e);
     }
   }
 
   _playTickSound() {
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
-      gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
-      oscillator.start(audioCtx.currentTime);
-      oscillator.stop(audioCtx.currentTime + 0.08);
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.08);
     } catch (e) {}
   }
 
@@ -438,7 +427,7 @@ async _initSDK() {
   }
 
   render() {
-    const progress = this._isRona ? (30 - this._countdown) / 30 * 100 : 0;
+    const progress = this._isRona ? ((30 - this._countdown) / 30) * 100 : 0;
 
     return html`
       <div class="widget-container 
