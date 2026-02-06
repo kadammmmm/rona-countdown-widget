@@ -5,7 +5,8 @@ export default {
   input: 'src/rona-countdown-widget.js',
   output: {
     file: 'dist/rona-countdown-widget.js',
-    format: 'es',
+    format: 'iife',
+    name: 'RonaCountdownWidget',
     sourcemap: true
   },
   plugins: [
