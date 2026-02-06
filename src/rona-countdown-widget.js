@@ -304,31 +304,45 @@ class RonaCountdownWidget extends LitElement {
       Desktop.agentStateInfo.addEventListener('updated', (event) => {
         this._sdkLogger.info('State update event received: ' + JSON.stringify(event));
         
-        // Event is an array of change objects like [{name: "subStatus", value: "Idle", oldValue: "Available"}, ...]
+        // Event is an array of change objects like [{name: "subStatus", value: "Idle"}, {name: "idleCode", value: {name: "RONA"}}]
         let newState = null;
+        let idleCodeName = null;
         
         if (Array.isArray(event)) {
-          // Find the subStatus or status change in the array
+          // Find the subStatus change
           const stateChange = event.find(item => item.name === 'subStatus' || item.name === 'status' || item.name === 'state');
           if (stateChange) {
             newState = stateChange.value;
+          }
+          // Find the idleCode change - this tells us if it's RONA
+          const idleCodeChange = event.find(item => item.name === 'idleCode');
+          if (idleCodeChange?.value?.name) {
+            idleCodeName = idleCodeChange.value.name;
           }
         } else if (event?.data && Array.isArray(event.data)) {
           const stateChange = event.data.find(item => item.name === 'subStatus' || item.name === 'status' || item.name === 'state');
           if (stateChange) {
             newState = stateChange.value;
           }
+          const idleCodeChange = event.data.find(item => item.name === 'idleCode');
+          if (idleCodeChange?.value?.name) {
+            idleCodeName = idleCodeChange.value.name;
+          }
         } else {
           // Fallback to old parsing method
           const data = event?.data || event;
           newState = data?.subStatus || data?.status || data?.state;
+          idleCodeName = data?.idleCode?.name;
         }
         
-        if (newState) {
-          this._currentAgentState = newState;
-          this._sdkLogger.info(`Agent state changed to: ${newState}`);
+        // Use idleCode name if available, otherwise use state
+        const displayState = idleCodeName || newState;
+        
+        if (displayState) {
+          this._currentAgentState = displayState;
+          this._sdkLogger.info(`Agent state changed to: ${displayState} (idleCode: ${idleCodeName}, subStatus: ${newState})`);
 
-          if (this._isRonaState(newState)) {
+          if (this._isRonaState(displayState)) {
             this._triggerRona();
           } else if (this._isRona) {
             this._cancelRona();
@@ -343,27 +357,39 @@ class RonaCountdownWidget extends LitElement {
         this._sdkLogger.info('eAgentStateChange event received: ' + JSON.stringify(event));
         
         let newState = null;
+        let idleCodeName = null;
         
         if (Array.isArray(event)) {
           const stateChange = event.find(item => item.name === 'subStatus' || item.name === 'status' || item.name === 'state');
           if (stateChange) {
             newState = stateChange.value;
           }
+          const idleCodeChange = event.find(item => item.name === 'idleCode');
+          if (idleCodeChange?.value?.name) {
+            idleCodeName = idleCodeChange.value.name;
+          }
         } else if (event?.data && Array.isArray(event.data)) {
           const stateChange = event.data.find(item => item.name === 'subStatus' || item.name === 'status' || item.name === 'state');
           if (stateChange) {
             newState = stateChange.value;
           }
+          const idleCodeChange = event.data.find(item => item.name === 'idleCode');
+          if (idleCodeChange?.value?.name) {
+            idleCodeName = idleCodeChange.value.name;
+          }
         } else {
           const data = event?.data || event;
           newState = data?.subStatus || data?.status || data?.state;
+          idleCodeName = data?.idleCode?.name;
         }
         
-        if (newState) {
-          this._currentAgentState = newState;
-          this._sdkLogger.info(`Agent state changed (eAgentStateChange) to: ${newState}`);
+        const displayState = idleCodeName || newState;
+        
+        if (displayState) {
+          this._currentAgentState = displayState;
+          this._sdkLogger.info(`Agent state changed (eAgentStateChange) to: ${displayState}`);
 
-          if (this._isRonaState(newState)) {
+          if (this._isRonaState(displayState)) {
             this._triggerRona();
           } else if (this._isRona) {
             this._cancelRona();
