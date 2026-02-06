@@ -1,223 +1,247 @@
 import { LitElement, html, css } from 'lit';
-import { Desktop } from '@wxcc-desktop/sdk';  // Official named import - confirmed in Cisco docs & samples
+import { Desktop } from '@wxcc-desktop/sdk';
 
 class RonaCountdownWidget extends LitElement {
   static styles = css`
     :host {
       display: block;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      height: 100%;
+      max-height: 48px;
     }
 
+    /* Main container - fits within 48px header */
     .widget-container {
-      width: 220px;
-      height: 80px;
-      background: rgba(30, 30, 50, 0.85);
-      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      border-radius: 6px;
       border: 1px solid #3a3a5c;
+      height: 32px;
+      max-height: 32px;
+      box-sizing: border-box;
       color: white;
-      overflow: hidden;
       position: relative;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      overflow: hidden;
       transition: all 0.3s ease;
     }
 
     .widget-container.rona-active {
-      background: linear-gradient(135deg, #8b0000, #ff0a0a);
-      animation: pulse 2s infinite;
+      background: linear-gradient(135deg, #4a0a0a 0%, #2a0505 100%);
+      border-color: #ff0a0a;
+      box-shadow: 0 0 12px rgba(255, 10, 10, 0.5);
+      animation: containerPulse 0.5s ease-in-out infinite alternate;
     }
 
-    .widget-container.shake {
-      animation: shake 0.5s;
+    .widget-container.rona-active.shake {
+      animation: containerPulse 0.5s ease-in-out infinite alternate, shake 0.1s linear infinite;
     }
 
     .widget-container.recovery {
-      background: linear-gradient(135deg, #006400, #00ff88);
-      animation: successPulse 1.5s;
+      background: linear-gradient(135deg, #0a2a0a 0%, #051a05 100%);
+      border-color: #00ff88;
+      box-shadow: 0 0 12px rgba(0, 255, 136, 0.5);
     }
 
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.03); }
-      100% { transform: scale(1); }
+    @keyframes containerPulse {
+      from { border-color: #ff0a0a; box-shadow: 0 0 12px rgba(255, 10, 10, 0.5); }
+      to { border-color: #ff6600; box-shadow: 0 0 18px rgba(255, 102, 0, 0.6); }
     }
 
     @keyframes shake {
-      0% { transform: translate(1px, 1px) rotate(0deg); }
-      10% { transform: translate(-1px, -2px) rotate(-1deg); }
-      20% { transform: translate(-3px, 0px) rotate(1deg); }
-      30% { transform: translate(3px, 2px) rotate(0deg); }
-      40% { transform: translate(1px, -1px) rotate(1deg); }
-      50% { transform: translate(-1px, 2px) rotate(-1deg); }
-      60% { transform: translate(-3px, 1px) rotate(0deg); }
-      70% { transform: translate(3px, 1px) rotate(-1deg); }
-      80% { transform: translate(-1px, -1px) rotate(1deg); }
-      90% { transform: translate(1px, 2px) rotate(0deg); }
-      100% { transform: translate(1px, -2px) rotate(-1deg); }
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-2px); }
+      75% { transform: translateX(2px); }
     }
 
-    @keyframes successPulse {
-      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,255,136,0.7); }
-      70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(0,255,136,0); }
-      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,255,136,0); }
+    /* Status dot */
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #00bceb;
+      box-shadow: 0 0 6px #00bceb;
+      flex-shrink: 0;
     }
 
-    .scanlines {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: repeating-linear-gradient(
-        to bottom,
-        transparent 0%,
-        rgba(255,255,255,0.03) 1px,
-        transparent 2px
-      );
-      pointer-events: none;
-      animation: scan 8s linear infinite;
+    .status-dot.rona {
+      background: #ff0a0a;
+      animation: dotPulse 0.3s ease-in-out infinite alternate;
     }
 
-    @keyframes scan {
-      0% { transform: translateY(-100%); }
-      100% { transform: translateY(100%); }
+    .status-dot.recovery {
+      background: #00ff88;
+      box-shadow: 0 0 8px #00ff88;
     }
 
-    .alert-icon {
-      position: absolute;
-      top: 12px;
-      left: 16px;
-      width: 48px;
-      height: 48px;
+    @keyframes dotPulse {
+      from { box-shadow: 0 0 4px #ff0a0a; transform: scale(1); }
+      to { box-shadow: 0 0 10px #ff0a0a; transform: scale(1.2); }
     }
 
-    .warning-triangle {
+    /* Warning triangle for RONA */
+    .warning-icon {
       width: 0;
       height: 0;
-      border-left: 24px solid transparent;
-      border-right: 24px solid transparent;
-      border-bottom: 42px solid #ffff00;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 14px solid #ffff00;
       position: relative;
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 4px #ffff00);
+      animation: trianglePulse 0.4s ease-in-out infinite alternate;
     }
 
-    .warning-triangle::after {
-      content: "!";
+    .warning-icon::after {
+      content: '!';
       position: absolute;
-      top: 8px;
-      left: -8px;
-      font-size: 28px;
+      top: 2px;
+      left: -3px;
+      font-size: 9px;
+      font-weight: 900;
       color: #000;
-      font-weight: bold;
     }
 
+    @keyframes trianglePulse {
+      from { filter: drop-shadow(0 0 4px #ffff00); }
+      to { filter: drop-shadow(0 0 8px #ff6600); }
+    }
+
+    /* Recovery checkmark */
     .recovery-check {
-      font-size: 48px;
-      color: #00ff88;
-      animation: checkFade 1.2s;
-    }
-
-    @keyframes checkFade {
-      0% { opacity: 0; transform: scale(0.5); }
-      60% { opacity: 1; transform: scale(1.2); }
-      100% { opacity: 1; transform: scale(1); }
-    }
-
-    .status-dot {
-      width: 48px;
-      height: 48px;
-      background: #00bceb;
+      width: 16px;
+      height: 16px;
       border-radius: 50%;
-      box-shadow: 0 0 15px #00bceb;
+      background: #00ff88;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 900;
+      color: #000;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px #00ff88;
     }
 
-    .countdown-section {
-      position: absolute;
-      top: 10px;
-      left: 70px;
-      font-size: 32px;
-      font-weight: bold;
-    }
-
+    /* Countdown number */
     .countdown-number {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 18px;
+      font-weight: 900;
       color: #ffff00;
-    }
-
-    .countdown-number.danger {
-      color: #ff0a0a;
-      animation: flash 0.8s infinite;
+      text-shadow: 0 0 8px #ffff00;
+      min-width: 24px;
+      text-align: center;
     }
 
     .countdown-number.critical {
       color: #ff6600;
-      animation: flash 0.6s infinite;
+      animation: numberPulse 0.3s ease-in-out infinite alternate;
     }
 
-    @keyframes flash {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+    .countdown-number.danger {
+      color: #ff0a0a;
+      animation: numberPulse 0.15s linear infinite;
+    }
+
+    @keyframes numberPulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.1); }
     }
 
     .countdown-unit {
-      font-size: 16px;
-      vertical-align: super;
+      font-size: 10px;
+      color: rgba(255, 255, 0, 0.8);
+      margin-left: -4px;
     }
 
+    /* Status label */
     .status-label {
-      position: absolute;
-      bottom: 12px;
-      left: 70px;
-      font-size: 16px;
+      font-size: 11px;
       font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #8a8aaa;
+      white-space: nowrap;
     }
 
     .status-label.rona {
-      color: #ffff00;
+      color: #ff0a0a;
+      text-shadow: 0 0 6px rgba(255, 10, 10, 0.6);
     }
 
     .status-label.recovery {
       color: #00ff88;
-      font-size: 20px;
+      text-shadow: 0 0 6px rgba(0, 255, 136, 0.6);
     }
 
+    /* Drama meter dots */
     .drama-meter {
-      position: absolute;
-      bottom: 8px;
-      right: 12px;
       display: flex;
-      gap: 4px;
+      gap: 2px;
+      margin-left: auto;
     }
 
     .drama-dot {
-      width: 8px;
-      height: 8px;
-      background: #444;
+      width: 4px;
+      height: 4px;
       border-radius: 50%;
-      transition: all 0.3s;
+      background: #333;
+      transition: all 0.3s ease;
     }
 
     .drama-dot.active {
       background: #ffff00;
-      box-shadow: 0 0 8px #ffff00;
+      box-shadow: 0 0 4px #ffff00;
     }
 
     .drama-dot.critical {
       background: #ff0a0a;
-      box-shadow: 0 0 12px #ff0a0a;
+      box-shadow: 0 0 4px #ff0a0a;
     }
 
+    /* Progress bar at bottom */
     .progress-bar {
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
-      height: 4px;
-      background: rgba(0,0,0,0.5);
+      height: 2px;
+      background: rgba(0, 0, 0, 0.3);
     }
 
     .progress-fill {
       height: 100%;
-      background: #ffff00;
+      background: linear-gradient(90deg, #ffff00, #ff6600);
       transition: width 1s linear;
     }
 
     .progress-fill.critical {
-      background: #ff0a0a;
+      background: linear-gradient(90deg, #ff6600, #ff0a0a);
+    }
+
+    /* Scanlines effect */
+    .scanlines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.03) 0px,
+        rgba(0, 0, 0, 0.03) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .widget-container.rona-active .scanlines {
+      opacity: 1;
     }
   `;
 
@@ -258,15 +282,17 @@ class RonaCountdownWidget extends LitElement {
     try {
       this._sdkLogger = Desktop.logger.createLogger('rona-countdown-widget');
 
-      // Initialize SDK - add widget context for better logging/tracking in WxCC
       await Desktop.config.init({
         widgetName: 'rona-countdown-widget',
-        widgetProvider: 'bucher-suter'  // Customize if needed
+        widgetProvider: 'bucher-suter'
       });
       this._sdkLogger.info('WxCC Desktop SDK initialized successfully');
 
-      // Fetch initial agent state
-      const initialState = Desktop.agentStateInfo.latestData?.state || 'Unknown';
+      // Get initial agent state - try multiple properties
+      const latestData = Desktop.agentStateInfo.latestData;
+      this._sdkLogger.info('Initial latestData: ' + JSON.stringify(latestData));
+      
+      const initialState = latestData?.subStatus || latestData?.status || latestData?.state || 'Available';
       this._currentAgentState = initialState;
       this._sdkLogger.info(`Initial agent state: ${initialState}`);
 
@@ -274,9 +300,14 @@ class RonaCountdownWidget extends LitElement {
         this._triggerRona();
       }
 
-      // Listen for real-time state changes
-      Desktop.agentStateInfo.addEventListener('eAgentStateChange', (event) => {
-        const newState = event.data?.state || 'Unknown';
+      // Listen for state changes - try the 'updated' event which is more common
+      Desktop.agentStateInfo.addEventListener('updated', (event) => {
+        this._sdkLogger.info('State update event received: ' + JSON.stringify(event));
+        
+        // Handle both direct data and nested data structures
+        const data = event?.data || event;
+        const newState = data?.subStatus || data?.status || data?.state || 'Unknown';
+        
         this._currentAgentState = newState;
         this._sdkLogger.info(`Agent state changed to: ${newState}`);
 
@@ -288,6 +319,27 @@ class RonaCountdownWidget extends LitElement {
 
         this.requestUpdate();
       });
+
+      // Also try eAgentStateChange event as backup
+      Desktop.agentStateInfo.addEventListener('eAgentStateChange', (event) => {
+        this._sdkLogger.info('eAgentStateChange event received: ' + JSON.stringify(event));
+        
+        const data = event?.data || event;
+        const newState = data?.subStatus || data?.status || data?.state || 'Unknown';
+        
+        this._currentAgentState = newState;
+        this._sdkLogger.info(`Agent state changed (eAgentStateChange) to: ${newState}`);
+
+        if (this._isRonaState(newState)) {
+          this._triggerRona();
+        } else if (this._isRona) {
+          this._cancelRona();
+        }
+
+        this.requestUpdate();
+      });
+
+      this.requestUpdate();
 
     } catch (err) {
       this._sdkLogger?.error(`SDK initialization failed: ${err.message}`);
@@ -305,15 +357,16 @@ class RonaCountdownWidget extends LitElement {
 
   _enterDemoMode() {
     this._isDemo = true;
-    this._currentAgentState = 'Available (Demo Mode)';
+    this._currentAgentState = 'Demo Mode';
     this.requestUpdate();
-    console.warn('[RONA Widget] Entered demo mode - SDK not detected in this environment');
+    console.warn('[RONA Widget] Entered demo mode - SDK not detected');
   }
 
   _isRonaState(state) {
-    // Standard WxCC SDK state for RONA (Redirection on No Answer)
-    // UI may display "RONA" but SDK uses 'NotResponding'
-    return state?.toUpperCase() === 'NOTRESPONDING';
+    if (!state) return false;
+    const upper = state.toUpperCase();
+    // Check for both RONA and NotResponding
+    return upper === 'RONA' || upper === 'NOTRESPONDING' || upper === 'NOT_RESPONDING';
   }
 
   _triggerRona() {
@@ -332,6 +385,7 @@ class RonaCountdownWidget extends LitElement {
       this._dramaMeter = Math.min(this._dramaMeter + 1, 10);
 
       if (this._countdown <= 10 && this._countdown > 0) {
+        this._isShaking = true;
         this._playTickSound();
       }
 
@@ -350,7 +404,7 @@ class RonaCountdownWidget extends LitElement {
     try {
       await Desktop.agentStateInfo.stateChange({
         state: 'Available',
-        auxCodeId: null  // Use null or fetch default from Desktop.agentStateInfo.latestData.idleCodes if required
+        auxCodeId: null
       });
       this._sdkLogger?.info('Successfully auto-recovered from RONA to Available');
     } catch (err) {
@@ -365,7 +419,7 @@ class RonaCountdownWidget extends LitElement {
     setTimeout(() => {
       this._showRecoveryMessage = false;
       this.requestUpdate();
-    }, 4000);
+    }, 3000);
 
     this.requestUpdate();
   }
@@ -394,9 +448,7 @@ class RonaCountdownWidget extends LitElement {
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.05);
-    } catch (e) {
-      console.warn('Audio error:', e);
-    }
+    } catch (e) {}
   }
 
   _playTickSound() {
@@ -419,13 +471,6 @@ class RonaCountdownWidget extends LitElement {
     return '';
   }
 
-  _getWarningMessage() {
-    if (this._countdown <= 5) return '⚠️ FINAL WARNING ⚠️';
-    if (this._countdown <= 10) return 'TIME IS RUNNING OUT!';
-    if (this._countdown <= 20) return 'RETURN TO AVAILABLE STATE';
-    return 'MISSED CALL DETECTED';
-  }
-
   render() {
     const progress = this._isRona ? ((30 - this._countdown) / 30) * 100 : 0;
 
@@ -435,29 +480,25 @@ class RonaCountdownWidget extends LitElement {
         ${this._isShaking ? 'shake' : ''} 
         ${this._showRecoveryMessage ? 'recovery' : ''}">
 
-        ${this._isRona ? html`<div class="scanlines"></div>` : ''}
+        <div class="scanlines"></div>
 
-        <div class="alert-icon">
-          ${this._isRona 
-            ? html`<div class="warning-triangle"></div>`
-            : this._showRecoveryMessage 
-              ? html`<div class="recovery-check">✓</div>`
-              : html`<div class="status-dot"></div>`}
-        </div>
+        <!-- Icon -->
+        ${this._isRona 
+          ? html`<div class="warning-icon"></div>`
+          : this._showRecoveryMessage 
+            ? html`<div class="recovery-check">✓</div>`
+            : html`<div class="status-dot ${this._showRecoveryMessage ? 'recovery' : ''}"></div>`}
 
+        <!-- Content -->
         ${this._isRona ? html`
-          <div class="countdown-section">
-            <span class="countdown-number ${this._getCountdownClass()}">${this._countdown}</span>
-            <span class="countdown-unit">sec</span>
-          </div>
+          <span class="countdown-number ${this._getCountdownClass()}">${this._countdown}</span>
+          <span class="countdown-unit">s</span>
           <span class="status-label rona">RONA</span>
-
           <div class="drama-meter">
             ${[...Array(5)].map((_, i) => html`
               <div class="drama-dot 
                 ${i < Math.ceil(this._dramaMeter / 2) ? 'active' : ''} 
-                ${this._countdown <= 10 ? 'critical' : ''}">
-              </div>
+                ${this._countdown <= 10 ? 'critical' : ''}"></div>
             `)}
           </div>
         ` : this._showRecoveryMessage ? html`
@@ -466,6 +507,7 @@ class RonaCountdownWidget extends LitElement {
           <span class="status-label">${this._currentAgentState}</span>
         `}
 
+        <!-- Progress bar -->
         ${this._isRona ? html`
           <div class="progress-bar">
             <div class="progress-fill ${this._countdown <= 10 ? 'critical' : ''}" 
